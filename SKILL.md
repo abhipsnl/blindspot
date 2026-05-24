@@ -131,7 +131,167 @@ Generate **complete, runnable** tests in the language's native framework:
 
 ---
 
-## Step 5 — Present Results
+## Step 5 — Verify Every Finding Before Writing It Down
+
+This step exists because a previous run of this skill shipped findings that
+didn't survive a 60-second self-audit. The skill is graded on **truth**, not
+**volume**. Inflating a report with shaky claims poisons the user's trust in
+the real findings.
+
+Verification runs in **three sub-passes** — truth checklist (5a), adversarial
+falsification (5b), confidence calibration (5c). All three must complete
+before Step 6 (presenting the report). Any finding that fails 5a or 5b is
+withdrawn; every surviving finding carries a confidence label from 5c.
+
+### Step 5a — Truth checklist (per finding)
+
+Before listing any finding, run it through this checklist. **Withdraw the
+finding silently if any answer is "no" or "I'm not sure."** Don't write it
+down and then explain why you're withdrawing it — that leaves doubt in the
+artifact and burns the user's attention.
+
+1. **Code-grounded.** Have you Read the relevant lines in the actual source
+   file in this session? (Not "I think I remember" — actually opened the
+   file. Cite `path:line` in the report.)
+2. **Mechanism is concrete.** Can you write the exact input → exact wrong
+   behavior in one sentence, without hedging? If you wrote "could", "may",
+   "might possibly" — the finding isn't ready.
+3. **Quantitative claims are measured, not estimated.** If you said "0.1ms
+   per call" or "200ns per lookup" or "50 KB per second" — did you measure,
+   or did you confabulate a plausible number to justify the finding? **Never
+   put a number in the report you didn't measure or cite a source for.**
+   Either run the measurement, find a citation, or remove the number.
+4. **Severity matches the mechanism.** "Critical" means production breaks for
+   real users, not "could theoretically happen in a contrived scenario." If
+   the only way to hit it requires the LLM to hallucinate AND the operator
+   to ignore three warnings, it's not Critical.
+5. **Not a theoretical class.** The skill is "edge case discovery", not
+   "computer science seminar." A finding that says "in principle, X could
+   happen" without a concrete trigger is a seminar finding. Withdraw.
+6. **Distinct from another finding.** If two findings describe the same
+   mechanism from different angles, collapse them. Two cross-referencing
+   findings inflate the count without informing.
+
+### What to do when a finding fails the checklist
+
+Withdraw it. Silently. Do **not**:
+- Write the finding then add "actually, withdrawn" — the user reads both,
+  cost is doubled
+- Downgrade Critical → High → Medium → Low to keep it in (the bar is
+  truth-or-out, not severity)
+- Add caveats like "could be theoretical, but worth noting" — that's the
+  seminar finding pattern
+
+What to do **instead**:
+- If you found something but couldn't verify it, file a one-line "needs
+  verification" note in a separate `🔬 UNVERIFIED HUNCHES` section. The
+  user can grep them later. They are NOT counted in the summary numbers.
+- Be willing to ship a report with **0 findings in a severity bucket**.
+  "Critical: 0" is the correct answer when the code genuinely has no
+  critical bugs. Don't promote a Medium to Critical to fill the slot.
+
+### Self-audit before pressing send (still 5a)
+
+After drafting the report but BEFORE moving to 5b, do this pass:
+
+> "Read my own report cold. For every finding, ask: would I bet $100 of my
+> own money this is real and the severity is right? If no, withdraw or
+> downgrade. For every number I wrote, ask: did I measure this or guess?
+> If guess, remove the number."
+
+A report with 3 audited findings is more valuable than 12 mixed ones. The
+user has finite attention; spend it on truth.
+
+### Step 5b — Adversarial falsification
+
+This step exists because the first pass is the same LLM optimizing for
+"find bugs"; it has a systemic bias toward false positives. The fix is
+explicitly running a SECOND pass that optimizes for "defend why these are
+NOT bugs." Findings that survive both passes ship; findings that don't are
+withdrawn.
+
+For every finding that passed 5a, run this prompt **on yourself** before
+keeping it:
+
+> "Switch roles. I am the engineer who wrote this code and I think the
+> blindspot report is wrong about finding [EC-N]. Argue the strongest case
+> for why this is NOT a bug. What input or precondition is in the report
+> impossible? What guard already exists upstream that the report missed?
+> What's the user's actual workflow that makes this scenario unreachable?
+> Be willing to call the original finding wrong if the defense is stronger
+> than the accusation."
+
+Three possible outcomes:
+
+1. **Defense wins.** The finding is wrong. Withdraw silently — same rules as
+   5a. Don't write "I considered this but withdrew" — write nothing.
+2. **Defense partially wins.** The mechanism is real but the severity was
+   inflated, or the trigger is narrower than originally described. Downgrade
+   severity, tighten the trigger description, keep the finding.
+3. **Defense loses.** The original finding stands. Carry it to 5c with the
+   defense's strongest counterargument noted in a one-line `Defense
+   considered:` field, so the user can see you actually tried to falsify it.
+
+A finding that hasn't survived 5b is not a finding. Don't ship a report that
+skipped this step — it's the single highest-leverage filter for false
+positives. Skipping it gets you back to the pre-skill error rate.
+
+#### What to look for as the defender
+
+These are the patterns that most often "defeat" a falsely-flagged finding:
+
+- **Upstream guard.** The function the report flagged is only ever called
+  after a validator that rules out the bad input. Look for the actual
+  call sites with Grep, not from memory.
+- **Type-system invariant.** The "what if it's null" finding is bogus when
+  the type is `Foo` not `Option<Foo>`. Check the actual type.
+- **Already-handled in a different layer.** The "race condition" finding is
+  bogus when there's a serializing queue between the two writers. Read the
+  caller, not just the function.
+- **Wrong language semantics.** "Integer overflow" is bogus in Python (big
+  ints) but real in Rust (debug panics, release wraps). Match the finding
+  to the language's actual behavior.
+- **Wrong runtime semantics.** "Mutable default argument" is real in Python
+  function defs but NOT in dataclass field types (`field(default_factory=...)`
+  exists for exactly this reason). Match the finding to the actual idiom in
+  use.
+
+### Step 5c — Confidence calibration
+
+Every finding that survived 5a + 5b ships with a **confidence label** the
+user can triage on. Without this, the user has to treat every finding
+identically, which is wrong — some you proved with a runnable test, some you
+reasoned from code, some you're 70% sure of.
+
+Three confidence levels, with HARD requirements per level:
+
+| Confidence    | Requirement                                                                |
+|---------------|----------------------------------------------------------------------------|
+| **Proven**    | You generated AND ran a test that demonstrates the bug (test FAILS on the   |
+|               | unfixed code; would PASS after the proposed fix). Include the test in the  |
+|               | report. This is the only "I am 100% sure" label.                            |
+| **High**      | You Read the load-bearing lines with cited `path:line`, traced the data    |
+|               | flow, and the mechanism is concrete. No execution, but no plausible        |
+|               | falsifier survived 5b either.                                              |
+| **Medium**    | The mechanism is plausible from the code you Read, but you couldn't       |
+|               | trace every preconditon (e.g. caller behavior wasn't in scope). 5b raised  |
+|               | a defense you couldn't fully refute.                                       |
+
+If you can't honestly assign at least **Medium** confidence, the finding
+goes in the `🔬 UNVERIFIED HUNCHES` section instead of the main report. It
+is not counted in the summary numbers.
+
+**Severity and confidence are independent axes.** A Critical bug at Medium
+confidence is still worth listing — the user might choose to investigate
+even at 70% sure. But the LABEL is not optional. Reports without confidence
+labels per finding are incomplete.
+
+The format in Step 6 carries the confidence on the same line as the finding
+ID so it can't be omitted by accident.
+
+---
+
+## Step 6 — Present Results
 
 Always structure output as:
 
@@ -142,19 +302,31 @@ Language: [detected language]
 ══════════════════════════════════════════════
 
 📊 SUMMARY
-  🔴 Critical:  N
-  🟠 High:      N
-  🟡 Medium:    N
-  🟢 Low:       N
+  🔴 Critical:  N    (Proven: a / High: b / Medium: c)
+  🟠 High:      N    (Proven: a / High: b / Medium: c)
+  🟡 Medium:    N    (Proven: a / High: b / Medium: c)
+  🟢 Low:       N    (Proven: a / High: b / Medium: c)
+
+  Pass 5a withdrawals: M findings dropped (truth checklist)
+  Pass 5b withdrawals: K findings dropped (adversarial falsification)
 
 🔴 CRITICAL — Fix Before Shipping
-  [EC-001] functionName() — Short description
+  [EC-001] [Proven|High|Medium] functionName() — Short description
+  Code:    path/to/file.rs:42-58  (cite the lines you actually Read)
   Input:   exact triggering input or scenario
   Why:     step-by-step mechanism of failure
   Impact:  production blast radius
   Fix:     one-line hint
+  Defense considered:  one line summarizing 5b's strongest counter (omit
+                       only when Proven — for those the test IS the
+                       defense and it failed)
+  Test:    name of the test that proves it (Proven-only; omit otherwise)
 
 [... etc for High, Medium, Low ...]
+
+Every finding line MUST carry both severity emoji AND confidence label
+[Proven|High|Medium] in brackets immediately after the ID. A finding
+without a confidence label is malformed and goes back to Step 5c.
 
 📋 INVARIANTS DISCOVERED
   functionName():
@@ -165,6 +337,13 @@ Language: [detected language]
 [complete runnable test code]
 
 🚀 Run: [install command] && [test command]
+
+🔬 UNVERIFIED HUNCHES (optional)
+  Things I noticed but couldn't ground in the code in this session.
+  Not counted in the summary numbers above. Treat as "worth a 5-minute
+  look", not findings.
+  - hunch 1
+  - hunch 2
 ```
 
 ---
@@ -186,12 +365,32 @@ For each service contract assumption found: give it a blast radius and a fix.
 
 ## Quality Bar
 
-You are **not done** until you have found at least:
+**Truth over volume.** A report with 0 findings on solid code is the correct
+output. A report with 6 inflated findings is worse than useless — it teaches
+the user to ignore future reports.
 
-- 3 edge cases the engineer **definitely did not think of**
-- 1 **concurrency or state** edge case (if applicable)
-- 1 **business logic** edge case (not just type errors)
-- Property tests covering **all discovered invariants**
-- At least one test that **actually fails** on the original code (proving bugs exist)
+**Effort over count.** You are not done until you have:
 
-If the code looks simple — look harder. Simple code has the most surprising edge cases.
+- **Actually Read** (with the file-reading tool, not from memory) every file
+  you cite in a finding. Cite `path:line` so the user can verify in one click.
+- **Run** the universal checklist against the code, not just listed it. For
+  every item, write down "checked, no issue found" or "checked, finding X
+  filed" — even if only in your scratchpad. Skipping items quietly = blindspot.
+- **Generated runnable tests** for every Critical or High finding. Tests that
+  don't compile or that pass against the buggy code are worse than no tests.
+- **Tried to falsify your own findings.** For each one, ask "what would make
+  this NOT a bug?" If the falsifier is plausible, withdraw or downgrade.
+
+**Things that are NOT a quality signal:**
+
+- Finding count. "3 minimum" is a former rule, removed because it caused
+  inflation. Sometimes the right count is 0; sometimes it's 12.
+- Severity distribution. Don't promote a Medium to Critical to make the
+  report "look serious." Severity reflects the mechanism's blast radius, not
+  the operator's blood pressure.
+- Volume of generated tests. One test that exercises the load-bearing
+  invariant beats ten tests that exercise type-system trivialities.
+
+**If the code looks simple, look harder — but also consider that it may
+genuinely be simple.** Sometimes a function with three branches really does
+have three branches. Don't invent a fourth.
