@@ -1,35 +1,23 @@
------
-
-## name: blindspot
-description: >
-Universal AI-powered edge case discovery and property test generation for ANY
-programming language. Use this skill when users want to find bugs before
-production, discover edge cases their tests miss, auto-generate property tests,
-audit code for hidden assumptions, or analyze distributed system contracts.
-Trigger for ANY of these phrases: “find edge cases”, “what could go wrong”,
-“generate tests”, “audit my code”, “find bugs”, “test coverage”, “shift left”,
-“property tests”, “invariants”, “fuzz my code”, “harden this”, “review for bugs”.
-Works with Python, JavaScript, TypeScript, Java, Go, Ruby, Rust, C#, PHP, and more.
-Also trigger for requests about distributed system contracts, API boundary bugs,
-service assumption mismatches, or race conditions. This skill makes
-formal-level guarantees accessible to average engineers — use it any time
-code correctness or hidden bugs are the topic, regardless of language.
+---
+name: blindspot
+description: "Universal AI-powered edge case discovery and property test generation for ANY programming language. Use when users want to find bugs before production, discover edge cases their tests miss, auto-generate property tests, audit code for hidden assumptions, or analyze distributed system contracts. Trigger phrases: 'find edge cases', 'what could go wrong', 'generate tests', 'audit my code', 'find bugs', 'test coverage', 'shift left', 'property tests', 'invariants', 'fuzz my code', 'harden this', 'review for bugs'. Works with JavaScript, TypeScript, Java, Go, Ruby, Rust, C#, PHP, and more. Also triggers for distributed system contracts, API boundary bugs, service assumption mismatches, or race conditions."
+---
 
 # BlindSpot — Universal Bug Discovery
 
-You find the bugs engineers don’t know they have, in **any language**.
+You find the bugs engineers don't know they have, in **any language**.
 
 ## Core Philosophy
 
-Tests prove what engineers *thought of*. The blindspot finds what they *didn’t*.
+Tests prove what engineers *thought of*. The blindspot finds what they *didn't*.
 
 Three-step process:
 
 1. **Intent Extraction** — What does this code *claim* vs *assume* vs *guarantee*?
-1. **Edge Case Discovery** — What inputs break those assumptions? Ranked by blast radius.
-1. **Test Generation** — Runnable property tests in the language’s native framework.
+2. **Edge Case Discovery** — What inputs break those assumptions? Ranked by blast radius.
+3. **Test Generation** — Runnable property tests in the language's native framework.
 
------
+---
 
 ## Step 1 — Receive Code
 
@@ -42,9 +30,9 @@ Accept code in any of these ways:
 
 **Auto-detect language** from: file extension, syntax patterns, imports, keywords.
 
-If language is ambiguous, ask once: *“Is this Python or JavaScript?”*
+If language is ambiguous, ask once: *"Is this TypeScript or JavaScript?"*
 
------
+---
 
 ## Step 2 — Extract Intent & Invariants
 
@@ -58,7 +46,7 @@ Analyze like a senior engineer doing a *suspicious* code review. Ask:
 
 Format the output as a structured intent map before proceeding.
 
------
+---
 
 ## Step 3 — Discover Edge Cases
 
@@ -66,27 +54,27 @@ Think as: **attacker** + **3am incident responder** + **QA veteran**.
 
 ### Blast Radius Scale
 
-|Level     |Meaning                                                                          |
-|----------|---------------------------------------------------------------------------------|
-|🔴 Critical|Data loss, security breach, financial error, silent corruption, cascading failure|
-|🟠 High    |User-facing error, data corruption, service degradation, wrong result returned   |
-|🟡 Medium  |Performance issue, degraded experience, recoverable error                        |
-|🟢 Low     |Cosmetic issue, minor inconsistency, log noise                                   |
+| Level       | Meaning                                                                          |
+|-------------|----------------------------------------------------------------------------------|
+| 🔴 Critical | Data loss, security breach, financial error, silent corruption, cascading failure|
+| 🟠 High     | User-facing error, data corruption, service degradation, wrong result returned   |
+| 🟡 Medium   | Performance issue, degraded experience, recoverable error                        |
+| 🟢 Low      | Cosmetic issue, minor inconsistency, log noise                                   |
 
 ### Universal Checklist — Always verify these:
 
 1. **Null/nil/None/undefined** — every parameter, every map lookup
-1. **Boundary numbers** — 0, -1, max_int, min_int, NaN, Infinity, epsilon
-1. **Empty collections** — empty array, empty string, empty map
-1. **Type coercion** — JS `==` traps, Python duck typing, Java widening
-1. **Float precision** — never use float for money or equality comparisons
-1. **Concurrency** — race conditions, double-reads, TOCTOU
-1. **Authorization** — can user A affect user B’s data?
-1. **Encoding** — UTF-8, emoji, null bytes, SQL injection chars, path traversal
-1. **Time** — timezone, DST, leap year, clock skew, timestamp overflow
-1. **Partial failure** — what if step 2 of 3 fails? Is it retryable?
-1. **Idempotency** — what if this runs twice?
-1. **Business logic** — valid inputs combining unexpectedly
+2. **Boundary numbers** — 0, -1, max_int, min_int, NaN, Infinity, epsilon
+3. **Empty collections** — empty array, empty string, empty map
+4. **Type coercion** — JS `==` traps, dynamic typing pitfalls, Java widening
+5. **Float precision** — never use float for money or equality comparisons
+6. **Concurrency** — race conditions, double-reads, TOCTOU
+7. **Authorization** — can user A affect user B's data?
+8. **Encoding** — UTF-8, emoji, null bytes, SQL injection chars, path traversal
+9. **Time** — timezone, DST, leap year, clock skew, timestamp overflow
+10. **Partial failure** — what if step 2 of 3 fails? Is it retryable?
+11. **Idempotency** — what if this runs twice?
+12. **Business logic** — valid inputs combining unexpectedly
 
 ### Language-Specific Additions:
 
@@ -96,13 +84,6 @@ Think as: **attacker** + **3am incident responder** + **QA veteran**.
 - Prototype pollution (`__proto__`, `constructor`)
 - Async/await — unhandled rejections, Promise.all partial failure
 - `typeof null === 'object'`
-
-**Python:**
-
-- Mutable default arguments (`def f(x=[])`)
-- Integer division vs float division
-- Generator exhaustion
-- GIL and threading assumptions
 
 **Java:**
 
@@ -124,22 +105,21 @@ Think as: **attacker** + **3am incident responder** + **QA veteran**.
 - `unwrap()` panics in production paths
 - Lifetime/ownership edge cases with async
 
------
+---
 
 ## Step 4 — Generate Property Tests
 
-Generate **complete, runnable** tests in the language’s native framework:
+Generate **complete, runnable** tests in the language's native framework:
 
-|Language  |Framework          |Install                        |
-|----------|-------------------|-------------------------------|
-|Python    |Hypothesis + pytest|`pip install hypothesis pytest`|
-|JavaScript|fast-check + Jest  |`npm install fast-check jest`  |
-|TypeScript|fast-check + Vitest|`npm install fast-check vitest`|
-|Java      |jqwik + JUnit 5    |Maven/Gradle dependency        |
-|Go        |rapid + testing    |`go get pgregory.net/rapid`    |
-|Ruby      |rantly + RSpec     |`gem install rantly rspec`     |
-|Rust      |proptest           |`cargo add proptest --dev`     |
-|C#        |FsCheck            |NuGet package                  |
+| Language   | Framework           | Install                         |
+|------------|---------------------|---------------------------------|
+| JavaScript | fast-check + Jest   | `npm install fast-check jest`   |
+| TypeScript | fast-check + Vitest | `npm install fast-check vitest` |
+| Java       | jqwik + JUnit 5     | Maven/Gradle dependency         |
+| Go         | rapid + testing     | `go get pgregory.net/rapid`     |
+| Ruby       | rantly + RSpec      | `gem install rantly rspec`      |
+| Rust       | proptest            | `cargo add proptest --dev`      |
+| C#         | FsCheck             | NuGet package                   |
 
 ### Test Requirements:
 
@@ -149,7 +129,7 @@ Generate **complete, runnable** tests in the language’s native framework:
 - Each test has a **docstring** explaining what invariant it tests and why
 - Final class/section: `EdgeCaseRegressions` with one test per critical case
 
------
+---
 
 ## Step 5 — Present Results
 
@@ -187,13 +167,13 @@ Language: [detected language]
 🚀 Run: [install command] && [test command]
 ```
 
------
+---
 
 ## Distributed System Mode
 
 When analyzing **services** or **APIs**, additionally check:
 
-- What does Service A **assume** Service B guarantees? (write it down, it’s usually wrong)
+- What does Service A **assume** Service B guarantees? (write it down, it's usually wrong)
 - What if the downstream call **succeeds but the local write fails**?
 - What if the **same message is processed twice**? (idempotency)
 - What if messages arrive **out of order**?
@@ -202,30 +182,7 @@ When analyzing **services** or **APIs**, additionally check:
 
 For each service contract assumption found: give it a blast radius and a fix.
 
------
-
-## CLI Tool (Local Usage)
-
-The `scripts/blindspot.py` script runs locally for any language.
-
-```bash
-pip install anthropic pytest hypothesis
-export ANTHROPIC_API_KEY=sk-ant-...
-
-# Any language — auto-detected from extension
-python scripts/blindspot.py payment.py
-python scripts/blindspot.py userService.ts
-python scripts/blindspot.py AuthService.java
-python scripts/blindspot.py payment_handler.go
-
-# With options
-python scripts/blindspot.py service.py --run-tests
-python scripts/blindspot.py api.js --output tests/api_blindspot.test.js
-```
-
-See `references/cli-guide.md` for full options and `examples/` for demos.
-
------
+---
 
 ## Quality Bar
 
