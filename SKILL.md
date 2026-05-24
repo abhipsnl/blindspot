@@ -19,6 +19,106 @@ Three-step process:
 
 ---
 
+## Foundational Rule — Read Source Before Claiming Values
+
+**This rule applies to EVERY step below, not just Step 5's verification
+checklist.** It exists because the failure mode it addresses
+(confabulating specific values about the code) shows up in Step 1's intent
+map, Step 2's invariant list, Step 3's edge-case descriptions, Step 4's
+generated tests, AND Step 5's audit — not just at the very end.
+
+**The rule:** any time you state a specific value about the code under
+analysis — thresholds, defaults, constants, env-var names, line numbers,
+function signatures, SQL clauses, formula terms — open the file and Read
+the relevant lines in this session FIRST, then cite `path:line` in
+whatever artifact you produce (intent map, finding, generated test).
+
+Do not answer from:
+- Memory of the file from earlier in the session (long sessions drift)
+- Training data ("functions named like this usually have signature X")
+- Inference ("a sensible developer would have set this constant to Y")
+- Repeated patterns in other codebases ("most retry configs use 0.5
+  as the threshold")
+
+### Why this is a skill-wide rule, not a Step 5 check
+
+Step 5a's `Quantitative claims are measured, not estimated` catches
+confabulated numbers IN FINDINGS. But the skill produces values in
+multiple places before findings exist:
+
+- **Step 2 intent map** says "this function assumes input length ≤ 200" —
+  but the code says 500. The downstream finding is built on a wrong
+  premise.
+- **Step 3 edge-case description** says "fails when budget exceeds 60s" —
+  but the budget cap is actually 30s. The trigger described in the
+  finding doesn't exist.
+- **Step 4 generated test** asserts `assert_eq!(result, 0.25)` against a
+  default that's actually 0.30. The test fails on correct code; the user
+  spends 20 minutes debugging the test before realizing the SKILL was
+  wrong.
+
+All three are caught by reading the source before writing the artifact,
+not after.
+
+### What counts as a "value" that needs a source
+
+- Numeric thresholds, defaults, caps, timeouts, retry counts, batch sizes
+- Window lengths in days/weeks/seconds, intervals
+- Env var names, config keys, table names, column names
+- SQL `WHERE`/`ORDER BY`/`LIMIT` clauses described in prose
+- Function signatures, parameter names, return types
+- "X happens when Y" claims about runtime behavior of the code (NOT
+  about general project process — those don't need file citations)
+- Test counts ("19 tests pass") — verify by running, not by recall
+- Formulas — verify the EXACT numerator and denominator terms, not just
+  the shape
+
+### Minimum bar per claim
+
+For each value you're about to put in any artifact (intent map, finding,
+test, invariant description, report summary):
+
+1. **Have you Read the source file in this session?** If no — Read it
+   now, even if you "remember" the value from earlier work or from a
+   sibling file.
+2. **Cite the path and line.** Format: `module/file.rs:42-58`. The user
+   can verify in one click; you can re-find it for the next claim.
+3. **If the value depends on a config parameter the caller passes**,
+   trace to the caller and cite that line too. Don't say "the window is
+   `days`" without showing what value `days` actually gets.
+
+### When estimation is OK
+
+Order-of-magnitude or "roughly N" claims about external systems (LLM
+latency, network round trips, browser timeouts, database query costs in
+generic terms) — these are fine without file citations because they're
+not from the code under analysis. Be explicit when you estimate:
+"roughly ~200ms" not "exactly 200ms."
+
+### Concrete failure that motivated this rule
+
+When asked to explain a velocity headline ratio in a codebase the skill
+had been analyzing for hours, the skill confidently cited grade
+thresholds (`>= 10 = A`, `>= 5 = B`, etc.) and a "rolling 4 week" window.
+Reading the actual file showed the thresholds were `>= 3 = A`, `>= 2 = B`,
+`>= 1 = C`, `>= 0.5 = D` and the window was 90 days (driven by the
+caller's parameter). About half the specifics were wrong. Every number
+came from memory + inference, not from re-reading the file.
+
+The skill had Read the file in an earlier turn — but the values had
+drifted in memory across the session, and the dashboard caller's
+parameter had never been read at all. The fix is: read again, cite
+again, even when "I'm pretty sure I remember."
+
+### Correction protocol when a previous claim was unverified
+
+Same rule as Step 5a withdrawals: open the file, read the actual value,
+post a correction with the cited line. Don't double down. Don't hedge
+with "I think it might be." Read, cite, correct. A correction citing
+`path:line` rebuilds trust faster than three sentences of hedging.
+
+---
+
 ## Step 1 — Receive Code
 
 Accept code in any of these ways:
